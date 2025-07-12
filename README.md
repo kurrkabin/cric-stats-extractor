@@ -1,88 +1,102 @@
-# 🏏 Cricket Match Stats Extractor & Exporter
+# 🏏 Cricket Stats Extractor - Excel & Google Sheets
 
-Enhanced cricket statistics extraction tool for ESPN scorecard data with Excel and Google Sheets export functionality.
+Standalone solutions for extracting cricket statistics directly from ESPN scorecard HTML in Excel and Google Sheets.
 
-## ✨ Features
+## ✨ What You Get
 
-- **Extract cricket match stats** from ESPN scorecard HTML
-- **Multiple match support** - collect stats from multiple matches
-- **Excel export** - downloadable .xlsx files with timestamped names
-- **Google Sheets export** - shareable live documents with public links
-- **Two-column format** - maintains Stat/Value layout as requested
-- **Enhanced UI** - improved interface with match naming and collection management
+- **Excel Workbook** with VBA macros for HTML processing
+- **Google Sheets** with Google Apps Script for cloud-based extraction
+- **Direct HTML pasting** - no external tools needed
+- **Two-column format** - Stat | Value layout as requested
+- **One-click extraction** - paste HTML and get instant stats
 
-## 📋 Quick Start
+## 🎯 How It Works
 
-### Option 1: Use the Enhanced Script (Recommended)
-```python
-# In a Jupyter notebook cell:
-exec(open('cricket_stats_enhanced.py').read())
+1. **Get ESPN HTML**: Go to cricket scorecard → Ctrl+U → Copy all
+2. **Paste in Cell A1**: Open your Excel/Google Sheets → Paste HTML
+3. **Extract Stats**: Click button (Excel) or menu (Google Sheets)
+4. **View Results**: Stats appear in columns D-E automatically
+
+## 📊 Solutions Available
+
+### Excel Solution
+- **VBA Macros** for HTML parsing
+- **Offline processing** - works without internet
+- **Macro buttons** for one-click extraction
+- **Professional formatting** with borders
+
+### Google Sheets Solution
+- **Google Apps Script** for cloud processing
+- **Custom menu** integration
+- **Formula support** - `=EXTRACT_CRICKET_STATS(A1)`
+- **Mobile compatible** - works on phones/tablets
+
+## � Quick Start
+
+### Excel Setup
+1. Create new Excel workbook (.xlsm)
+2. Enable macros in Trust Center
+3. Add VBA code from `Cricket_Stats_Extractor.xlsx`
+4. Save and test with ESPN HTML
+
+### Google Sheets Setup
+1. Create new Google Sheets document
+2. Go to Extensions → Apps Script
+3. Paste code from `Google_Sheets_Cricket_Stats.gs`
+4. Authorize and test with ESPN HTML
+
+## � Template Layout
+
 ```
-
-### Option 2: Run the Original Notebook
-Open `Test_Cricket_Matches.ipynb` in Jupyter and run all cells.
-
-### Option 3: Manual Installation
-```bash
-pip install pandas beautifulsoup4 ipywidgets openpyxl gspread oauth2client google-auth google-auth-oauthlib google-auth-httplib2
+   A              B              C              D              E
+1  [ESPN HTML]                                  Stat           Value
+2                                               Highest...     Player (123) – Team
+3                                               Top Batter-A   Player (95)
+4                                               Top Batter-B   Player (87)
+5                                               Total Fours    Team A 45 : 38 Team B
+6                                               Most Sixes     Team A 12 : 8 Team B
+7                                               Run Outs       Team B 3 : 1 Team A
 ```
-
-## 🎯 How to Use
-
-1. **Extract Stats**: Paste ESPN cricket scorecard HTML and click "Extract Stats"
-2. **Add to Collection**: Click "Add to Collection" to store the match
-3. **Repeat**: Add multiple matches to the same collection
-4. **Export**: Choose Excel or Google Sheets export
-
-## 📊 Export Options
-
-### Excel Export
-- Creates timestamped `.xlsx` files
-- Direct download links in notebook
-- Three-column format: Match | Stat | Value
-
-### Google Sheets Export
-- Creates shareable live documents
-- Public viewing links
-- Real-time collaboration
-- Requires Google Cloud setup (see guide)
-
-## 📖 Documentation
-
-- **[Complete Guide](CRICKET_STATS_EXPORT_GUIDE.md)** - Detailed instructions and setup
-- **[Enhanced Script](cricket_stats_enhanced.py)** - Full Python implementation
-- **[Original Notebook](Test_Cricket_Matches.ipynb)** - Jupyter notebook version
-
-## 🔧 Google Sheets Setup
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create project and enable Google Sheets API
-3. Create Service Account and download JSON key
-4. Use "Setup Google Sheets" button in the interface
 
 ## 📁 Files
 
-- `cricket_stats_enhanced.py` - Enhanced Python script with export functionality
-- `Test_Cricket_Matches.ipynb` - Original Jupyter notebook
-- `CRICKET_STATS_EXPORT_GUIDE.md` - Complete documentation
-- `requirements.txt` - Python dependencies
+- **`Cricket_Stats_Extractor.xlsx`** - Excel VBA code
+- **`Google_Sheets_Cricket_Stats.gs`** - Google Apps Script code
+- **`EXCEL_GOOGLE_SHEETS_GUIDE.md`** - Complete setup guide
+- **`Cricket_Stats_Template.md`** - Ready-to-use template
+- **`Test_Cricket_Matches.ipynb`** - Original Jupyter notebook (alternative)
 
 ## 🚀 Example Output
 
-```
-Match                  | Stat                     | Value
---------------------- | ------------------------ | --------------------------------
-India vs Australia   | Highest Individual Score | Kohli (95) – India
-India vs Australia   | Top Batter – India       | Kohli (95)
-India vs Australia   | Top Batter – Australia   | Smith (87)
-India vs Australia   | Total Match Fours        | India 45 : 38 Australia
-India vs Australia   | Most Match Sixes         | India 12 : 8 Australia
-```
+| Stat | Value |
+|------|-------|
+| Highest Individual Score | Kohli (183) – India |
+| Top Batter – India | Kohli (183) |
+| Top Batter – Australia | Smith (131) |
+| Total Match Fours | India 87 : 65 Australia |
+| Most Match Sixes | India 12 : 8 Australia |
+| Most Run Outs (by bowling side) | Australia 2 : 1 India |
+
+## 📖 Documentation
+
+- **[Complete Setup Guide](EXCEL_GOOGLE_SHEETS_GUIDE.md)** - Step-by-step instructions
+- **[Ready-to-Use Template](Cricket_Stats_Template.md)** - Quick start template
+- **[Original Notebook](Test_Cricket_Matches.ipynb)** - Jupyter alternative
+
+## 🔧 Features
+
+✅ **Paste HTML directly** in cell A1
+✅ **Automatic extraction** with one click/menu
+✅ **Two-column output** (Stat | Value)
+✅ **Professional formatting** with borders
+✅ **Error handling** with clear messages
+✅ **Multiple match support** in same sheet
+✅ **Works offline** (Excel) or **cloud-based** (Google Sheets)
 
 ## 📞 Support
 
-For issues or questions, see the [troubleshooting section](CRICKET_STATS_EXPORT_GUIDE.md#troubleshooting) in the complete guide.
+Common issues and solutions in the [troubleshooting section](EXCEL_GOOGLE_SHEETS_GUIDE.md#troubleshooting).
 
 ---
 
-*Enhanced version with Excel and Google Sheets export functionality*
+*Standalone Excel and Google Sheets solutions for cricket stats extraction* 🏏

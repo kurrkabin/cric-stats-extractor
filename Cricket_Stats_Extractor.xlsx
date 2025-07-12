@@ -1,0 +1,159 @@
+Sub ExtractCricketStats()
+    '🏏 Cricket Stats Extractor for ESPN Scorecard HTML
+    'Paste ESPN HTML in cell A1, stats will appear in columns D-E
+    
+    Dim htmlText As String
+    Dim doc As Object
+    Dim tables As Object
+    Dim rows As Object
+    Dim cells As Object
+    Dim i As Integer, j As Integer
+    
+    ' Clear previous results
+    Range("D:E").Clear
+    
+    ' Get HTML from cell A1
+    htmlText = Range("A1").Value
+    If htmlText = "" Then
+        MsgBox "Please paste ESPN scorecard HTML in cell A1"
+        Exit Sub
+    End If
+    
+    ' Create HTML document object
+    Set doc = CreateObject("htmlfile")
+    doc.body.innerHTML = htmlText
+    
+    ' Extract team names from innings headers
+    Dim teamNames As Collection
+    Set teamNames = New Collection
+    
+    Dim inningsHeaders As Object
+    Set inningsHeaders = doc.querySelectorAll("span.ds-text-title-xs.ds-font-bold.ds-capitalize")
+    
+    ' Get unique team names
+    Dim team1 As String, team2 As String
+    Dim tempTeam As String
+    For i = 0 To inningsHeaders.Length - 1
+        tempTeam = Replace(inningsHeaders(i).innerText, " Innings", "")
+        If team1 = "" Then
+            team1 = tempTeam
+        ElseIf team2 = "" And tempTeam <> team1 Then
+            team2 = tempTeam
+        End If
+    Next i
+    
+    If team1 = "" Or team2 = "" Then
+        MsgBox "Could not detect team names from HTML"
+        Exit Sub
+    End If
+    
+    ' Initialize stat collectors
+    Dim fours1 As Integer, fours2 As Integer
+    Dim sixes1 As Integer, sixes2 As Integer
+    Dim runOuts1 As Integer, runOuts2 As Integer
+    Dim topBatter1 As String, topBatter2 As String
+    Dim topScore1 As Integer, topScore2 As Integer
+    Dim highestScorer As String, highestScore As Integer
+    
+    ' Get all batting tables
+    Set tables = doc.querySelectorAll("table.ci-scorecard-table")
+    
+    For i = 0 To tables.Length - 1
+        Set rows = tables(i).querySelectorAll("tr")
+        
+        ' Skip header row
+        For j = 1 To rows.Length - 1
+            Set cells = rows(j).querySelectorAll("td")
+            If cells.Length >= 8 Then
+                Dim playerName As String
+                Dim runs As Integer, fours As Integer, sixes As Integer
+                
+                playerName = Split(Split(cells(0).innerText, "†")(0), "(")(0)
+                playerName = Trim(playerName)
+                
+                On Error Resume Next
+                runs = CInt(cells(2).innerText)
+                fours = CInt(cells(5).innerText)
+                sixes = CInt(cells(6).innerText)
+                On Error GoTo 0
+                
+                ' Determine which team this is
+                Dim currentTeam As String
+                If i Mod 2 = 0 Then
+                    currentTeam = team1
+                    fours1 = fours1 + fours
+                    sixes1 = sixes1 + sixes
+                    If runs > topScore1 Then
+                        topScore1 = runs
+                        topBatter1 = playerName
+                    End If
+                Else
+                    currentTeam = team2
+                    fours2 = fours2 + fours
+                    sixes2 = sixes2 + sixes
+                    If runs > topScore2 Then
+                        topScore2 = runs
+                        topBatter2 = playerName
+                    End If
+                End If
+                
+                ' Track highest overall scorer
+                If runs > highestScore Then
+                    highestScore = runs
+                    highestScorer = playerName & " – " & currentTeam
+                End If
+                
+                ' Count run outs
+                Dim rowText As String
+                rowText = ""
+                For k = 0 To cells.Length - 1
+                    rowText = rowText & " " & cells(k).innerText
+                Next k
+                
+                If InStr(LCase(rowText), "run out") > 0 Then
+                    If currentTeam = team1 Then
+                        runOuts2 = runOuts2 + 1  ' Credit to bowling team
+                    Else
+                        runOuts1 = runOuts1 + 1
+                    End If
+                End If
+            End If
+        Next j
+    Next i
+    
+    ' Output results in 2-column format
+    Range("D1").Value = "Stat"
+    Range("E1").Value = "Value"
+    
+    Range("D2").Value = "Highest Individual Score"
+    Range("E2").Value = highestScorer & " (" & highestScore & ")"
+    
+    Range("D3").Value = "Top Batter – " & team1
+    Range("E3").Value = topBatter1 & " (" & topScore1 & ")"
+    
+    Range("D4").Value = "Top Batter – " & team2
+    Range("E4").Value = topBatter2 & " (" & topScore2 & ")"
+    
+    Range("D5").Value = "Total Match Fours"
+    Range("E5").Value = team1 & " " & fours1 & " : " & fours2 & " " & team2
+    
+    Range("D6").Value = "Most Match Sixes"
+    Range("E6").Value = team1 & " " & sixes1 & " : " & sixes2 & " " & team2
+    
+    Range("D7").Value = "Most Run Outs (by bowling side)"
+    Range("E7").Value = team2 & " " & runOuts2 & " : " & runOuts1 & " " & team1
+    
+    ' Format the output
+    Range("D1:E1").Font.Bold = True
+    Range("D1:E7").Borders.LineStyle = xlContinuous
+    Range("D:E").Columns.AutoFit
+    
+    MsgBox "Cricket stats extracted successfully!"
+    
+End Sub
+
+Sub ClearData()
+    '🗑️ Clear all data
+    Range("A:E").Clear
+    MsgBox "Data cleared!"
+End Sub
