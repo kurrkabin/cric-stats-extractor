@@ -3,10 +3,13 @@ from bs4 import BeautifulSoup
 
 st.set_page_config(layout="wide")
 st.title("Cricket Scorecard Extractor 🏏")
-st.markdown("Paste the full HTML (view-source / Ctrl+U) of an ESPNcricinfo scorecard below:")
+st.markdown(
+    "Paste the *full* HTML source (Ctrl-U → Ctrl-A → Ctrl-C) of an ESPNcricinfo "
+    "scorecard below and click **Extract Stats**."
+)
 
 html_input = st.text_area(
-    "Paste full HTML (Ctrl+U page source) here …",
+    "HTML source:",
     height=400,
     key="html_input"
 )
@@ -15,6 +18,7 @@ def bold(text: str) -> str:
     return f"**{text}**"
 
 def nice_line(left_team: str, left_val: int, right_team: str, right_val: int) -> str:
+    """Render “team value : value team”, bolding the larger value."""
     left  = f"{left_team} {left_val}"
     right = f"{right_val} {right_team}"
     if left_val > right_val:
@@ -26,17 +30,20 @@ def nice_line(left_team: str, left_val: int, right_team: str, right_val: int) ->
 def extract_cricket_stats(raw_html: str) -> str:
     soup = BeautifulSoup(raw_html, "html.parser")
 
+    # match title
     title_tag = soup.find("h1") or soup.find("title")
     match_title = title_tag.get_text(" ", strip=True) if title_tag else "Match Summary"
 
+    # teams
     teams = []
     for span in soup.select("span.ds-text-title-xs.ds-font-bold.ds-capitalize"):
         t = span.get_text(strip=True).replace(" Innings", "")
         if t and t not in teams:
             teams.append(t)
     if len(teams) < 2:
-        return "❌ Could not detect both teams."
+        return "❌ Could not detect both teams."
 
+    # split tables
     bats, bowls = [], []
     for tbl in soup.find_all("table"):
         heads = [th.get_text(strip=True).lower() for th in tbl.find_all("th")]
@@ -50,6 +57,7 @@ def extract_cricket_stats(raw_html: str) -> str:
     runouts = {t: 0 for t in teams}
     batter_team, top_bat, top_all = {}, {}, {}
 
+    # ── batting tables ────────────────────────────────────────────────
     for i, tbl in enumerate(bats):
         bat_t, bowl_t = teams[i % 2], teams[1 - (i % 2)]
         best_n, best_r = "", 0
@@ -79,6 +87,7 @@ def extract_cricket_stats(raw_html: str) -> str:
 
         top_bat[bat_t] = (best_n, best_r)
 
+    # ── bowling tables ────────────────────────────────────────────────
     bowl_stats = {t: [] for t in teams}
     for i, tbl in enumerate(bowls):
         bowl_t = teams[1 - (i % 2)]
@@ -100,41 +109,45 @@ def extract_cricket_stats(raw_html: str) -> str:
 
     def best_bowler(lst):
         if not lst:
-            return ["No wickets"]
-        lst.sort(key=lambda x: (-x[1], x[2]))   # most wickets, then fewest runs
+            return ["No wickets"]
+        # sort: most wickets desc, then fewest runs asc
+        lst.sort(key=lambda x: (-x[1], x[2]))
         top_wkts = lst[0][1]
         best_runs = min(r for _, w, r in lst if w == top_wkts)
         return [f"{n} ({w})" for n, w, r in lst if w == top_wkts and r == best_runs]
 
     top_bowl = {t: best_bowler(bowl_stats[t]) for t in teams}
 
+    # highest individual batter
     hi_name, hi_runs = max(top_all.items(), key=lambda x: x[1])
     hi_team = batter_team.get(hi_name, "Unknown")
 
+    # ── summary lines ─────────────────────────────────────────────────
     lines = [
-        f"### {match_title}",
+        f"### {match_title}",                            # smaller heading
         "",
-        f"🏅 Highest Individual Score: {hi_name} ({hi_runs}) – {hi_team}  ",
+        f"🏅 Highest Individual Score: {hi_name} ({hi_runs}) – {hi_team}  ",
         "",
-        f"4️⃣ Total Match Fours: {nice_line(teams[0], fours[teams[0]], teams[1], fours[teams[1]])}  ",
-        f"6️⃣ Total Match Sixes: {nice_line(teams[0], sixes[teams[0]], teams[1], sixes[teams[1]])}  ",
+        f"4️⃣ Total Match Fours: {nice_line(teams[0], fours[teams[0]], teams[1], fours[teams[1]])}  ",
+        f"6️⃣ Total Match Sixes: {nice_line(teams[0], sixes[teams[0]], teams[1], sixes[teams[1]])}  ",
         "",
-        f"🏏 Top Batter – {teams[0]}: {top_bat.get(teams[0], ('N/A',0))[0]} "
+        f"🏏 Top Batter – {teams[0]}: {top_bat.get(teams[0], ('N/A',0))[0]} "
         f"({top_bat.get(teams[0], ('',0))[1]})  ",
-        f"🏏 Top Batter – {teams[1]}: {top_bat.get(teams[1], ('N/A',0))[0]} "
+        f"🏏 Top Batter – {teams[1]}: {top_bat.get(teams[1], ('N/A',0))[0]} "
         f"({top_bat.get(teams[1], ('',0))[1]})  ",
         "",
-        f"⚾ Top Bowler – {teams[0]}: {', '.join(top_bowl[teams[0]])}  ",
-        f"⚾ Top Bowler – {teams[1]}: {', '.join(top_bowl[teams[1]])}  ",
+        # Top Bowler lines restored
+        f"⚾ Top Bowler – {teams[0]}: {', '.join(top_bowl[teams[0]])}  ",
+        f"⚾ Top Bowler – {teams[1]}: {', '.join(top_bowl[teams[1]])}  ",
         "",
-        f"🏃 Most Run Outs (by bowling side): "
+        f"🏃 Most Run Outs (by bowling side): "
         f"{nice_line(teams[0], runouts[teams[0]], teams[1], runouts[teams[1]])}  "
     ]
     return "\n".join(lines)
 
-if st.button("Extract Stats"):
+if st.button("Extract Stats"):
     raw = html_input.strip()
     if raw:
-        st.markdown(extract_cricket_stats(raw))
+        st.markdown(extract_cricket_stats(raw), unsafe_allow_html=True)
     else:
-        st.warning("❗ Please paste the HTML first.")
+        st.warning("❗ Please paste the HTML first.")
