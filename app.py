@@ -150,19 +150,35 @@ if st.button("Extract Stats"):
         res = extract(html)  # store the result once
         st.markdown(res, unsafe_allow_html=True)
 
-        # CSV export (self-contained)
-        import io, csv
+        # Match title (for CSV contents + filename)
         match_title = res.splitlines()[0].lstrip("# ").strip() if res else "Match Summary"
-        buf = io.StringIO()
-        writer = csv.writer(buf)
-        writer.writerow(["match", "output"])
-        writer.writerow([match_title, res])
-        csv_bytes = buf.getvalue().encode("utf-8-sig")
+
+        # Safe filename based on the match title
+        def _safe_filename(name: str) -> str:
+            import re
+            name = re.sub(r'^\s*#+\s*', '', name)                 # strip leading markdown #'s
+            name = re.sub(r'[\\/:*?"<>|]+', ' ', name)            # remove illegal filename chars
+            name = re.sub(r'\s+', ' ', name).strip()              # collapse whitespace
+            return (name or "scorecard_extract")[:120]            # trim to a sane length
+
+        filename = f"{_safe_filename(match_title)}.csv"
+
+        # CSV export (cached so repeat downloads are instant)
+        @st.cache_data(show_spinner=False)
+        def _build_csv(res_text: str, title: str):
+            import io, csv
+            buf = io.StringIO()
+            w = csv.writer(buf)
+            w.writerow(["match", "output"])
+            w.writerow([title, res_text])
+            return buf.getvalue().encode("utf-8")
+
+        csv_bytes = _build_csv(res, match_title)
 
         st.download_button(
             label="Download CSV of this result",
             data=csv_bytes,
-            file_name="scorecard_extract.csv",
+            file_name=filename,
             mime="text/csv",
         )
 
