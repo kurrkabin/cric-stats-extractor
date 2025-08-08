@@ -143,8 +143,23 @@ def extract(raw):
     return md
 
 # ── run button ──────────────────────────────────────────────
-if st.button("Extract Stats"):
+if st.button("Extract Stats"):
     if html.strip():
-        st.markdown(extract(html), unsafe_allow_html=True)
+        res = extract(html)  # store the result once
+        st.markdown(res, unsafe_allow_html=True)
+
+        # CSV export
+        match_title = res.splitlines()[0].lstrip("# ").strip() if res else "Match Summary"
+        df = pd.DataFrame([{"match": match_title, "output": res}])
+        csv_bytes = df.to_csv(index=False).encode("utf-8")
+
+        st.download_button(
+            label="Download CSV of this result",
+            data=csv_bytes,
+            file_name="scorecard_extract.csv",
+            mime="text/csv"
+        )
+
     else:
-        st.warning("❗ Please paste the HTML first.")
+        st.warning("❗ Please paste the HTML first.")
+
