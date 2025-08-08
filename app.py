@@ -1,7 +1,5 @@
 import streamlit as st
 from bs4 import BeautifulSoup
-import io, csv
-
 
 st.set_page_config(layout="wide")
 st.title("Cricket Scorecard Extractor 🏏")
@@ -145,26 +143,8 @@ def extract(raw):
     return md
 
 # ── run button ──────────────────────────────────────────────
-if st.button("Extract Stats"):
+if st.button("Extract Stats"):
     if html.strip():
-        res = extract(html)  # store the result once
-        st.markdown(res, unsafe_allow_html=True)
-
-        # CSV export (self-contained)
-        import io, csv
-        match_title = res.splitlines()[0].lstrip("# ").strip() if res else "Match Summary"
-        buf = io.StringIO()
-        writer = csv.writer(buf)
-        writer.writerow(["match", "output"])
-        writer.writerow([match_title, res])
-        csv_bytes = buf.getvalue().encode("utf-8-sig")
-
-        st.download_button(
-            label="Download CSV of this result",
-            data=csv_bytes,
-            file_name="scorecard_extract.csv",
-            mime="text/csv",
-        )
+        st.markdown(extract(html), unsafe_allow_html=True)
     else:
-        st.warning("❗ Please paste the HTML first.")
-
+        st.warning("❗ Please paste the HTML first.")
