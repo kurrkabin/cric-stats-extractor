@@ -149,21 +149,22 @@ if st.button("Extract Stats"):
     if html.strip():
         res = extract(html)  # store the result once
         st.markdown(res, unsafe_allow_html=True)
-    
-        # CSV export
+
+        # CSV export (self-contained)
+        import io, csv
         match_title = res.splitlines()[0].lstrip("# ").strip() if res else "Match Summary"
         buf = io.StringIO()
         writer = csv.writer(buf)
         writer.writerow(["match", "output"])
         writer.writerow([match_title, res])
+        csv_bytes = buf.getvalue().encode("utf-8-sig")
 
         st.download_button(
             label="Download CSV of this result",
             data=csv_bytes,
             file_name="scorecard_extract.csv",
-            mime="text/csv"
+            mime="text/csv",
         )
-
     else:
         st.warning("❗ Please paste the HTML first.")
 
