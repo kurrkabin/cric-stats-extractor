@@ -1,5 +1,7 @@
 import streamlit as st
 from bs4 import BeautifulSoup
+import io, csv
+
 
 st.set_page_config(layout="wide")
 st.title("Cricket Scorecard Extractor 🏏")
@@ -126,8 +128,8 @@ def extract(raw):
         "",
         f"🏅 Highest Individual Score: {hi_name} ({hi_runs}) – {hi_team}  ",
         "",
-        f"4️⃣ Total Match Fours: {nice_line(teams[0], fours[teams[0]], teams[1], fours[teams[1]])}  ",
-        f"6️⃣ Total Match Sixes: {nice_line(teams[0], sixes[teams[0]], teams[1], sixes[teams[1]])}  ",
+        f"️⃣ Total Match Fours: {nice_line(teams[0], fours[teams[0]], teams[1], fours[teams[1]])}  ",
+        f"️⃣ Total Match Sixes: {nice_line(teams[0], sixes[teams[0]], teams[1], sixes[teams[1]])}  ",
         "",
         f"🏏 Top Batter – {teams[0]}: {', '.join(top_bat[teams[0]][0])} "
         f"({top_bat[teams[0]][1]})  ",
@@ -143,8 +145,25 @@ def extract(raw):
     return md
 
 # ── run button ──────────────────────────────────────────────
-if st.button("Extract Stats"):
+if st.button("Extract Stats"):
     if html.strip():
-        st.markdown(extract(html), unsafe_allow_html=True)
+        res = extract(html)  # store the result once
+        st.markdown(res, unsafe_allow_html=True)
+
+        # CSV export (self-contained)
+        import io, csv
+        match_title = res.splitlines()[0].lstrip("# ").strip() if res else "Match Summary"
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["match", "output"])
+        writer.writerow([match_title, res])
+        csv_bytes = buf.getvalue().encode("utf-8-sig")
+
+        st.download_button(
+            label="Download CSV of this result",
+            data=csv_bytes,
+            file_name="scorecard_extract.csv",
+            mime="text/csv",
+        )
     else:
-        st.warning("❗ Please paste the HTML first.")
+        st.warning("❗ Please paste the HTML first.")
