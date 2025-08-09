@@ -1,5 +1,6 @@
 import streamlit as st
 from bs4 import BeautifulSoup
+import re
 import io, csv
 
 
@@ -42,7 +43,8 @@ def extract(raw):
         heads = [th.get_text(strip=True).lower() for th in tbl.find_all("th")]
         if {"batting", "4s", "6s"}.issubset(heads):
             bat_tbls.append(tbl)
-        elif {"bowling", "w", "econ"}.issubset(heads):
+        elif "bowling" in heads and any(h in heads for h in ("w", "wk", "wkts", "wickets")):
+
             bowl_tbls.append(tbl)
 
     fours   = {t: 0 for t in teams}
@@ -91,20 +93,36 @@ def extract(raw):
     bowl_stats = {t: [] for t in teams}
     for i, tbl in enumerate(bowl_tbls):
         bowl_t = teams[1 - (i % 2)]
-        heads  = [th.get_text(strip=True).lower() for th in tbl.find_all("th")]
-        r_idx  = heads.index("r") if "r" in heads else 3
-        w_idx  = heads.index("w") if "w" in heads else 4
+        heads = [th.get_text(" ", strip=True).lower().replace("\xa0", " ") for th in tbl.find_all("th")]
+
+        def _find_idx(options, default=None):
+            for o in options:
+                if o in heads:
+                    return heads.index(o)
+            return default
+
+        # accept “r” or “runs”, and “w/wk/wkts/wickets”
+        r_idx = _find_idx(("r", "runs"), 3)
+        w_idx = _find_idx(("w", "wk", "wkts", "wickets"), 4)
 
         for row in tbl.find_all("tr")[1:]:
             tds = row.find_all("td")
             if len(tds) <= max(r_idx, w_idx):
                 continue
-            name = tds[0].get_text(strip=True).split("(")[0].strip()
-            try:
-                runs = int(tds[r_idx].get_text(strip=True))
-                wkts = int(tds[w_idx].get_text(strip=True))
-            except ValueError:
+
+            # bowler name (skip Extras/Total rows)
+            name = tds[0].get_text(" ", strip=True).split("(")[0].strip()
+            if not name or name.lower().startswith(("extras", "total")):
                 continue
+
+            # tolerant numeric parsing (handles dashes/extra text)
+            runs_txt = tds[r_idx].get_text(strip=True)
+            wkts_txt = tds[w_idx].get_text(strip=True)
+            m_r = re.search(r"\d+", runs_txt)
+            m_w = re.search(r"\d+", wkts_txt)
+            runs = int(m_r.group()) if m_r else 0
+            wkts = int(m_w.group()) if m_w else 0
+
             bowl_stats[bowl_t].append((name, wkts, runs))
 
     def best_bowler(lst):
@@ -128,8 +146,8 @@ def extract(raw):
         "",
         f"🏅 Highest Individual Score: {hi_name} ({hi_runs}) – {hi_team}  ",
         "",
-        f"️⃣ Total Match Fours: {nice_line(teams[0], fours[teams[0]], teams[1], fours[teams[1]])}  ",
-        f"️⃣ Total Match Sixes: {nice_line(teams[0], sixes[teams[0]], teams[1], sixes[teams[1]])}  ",
+        f"4️⃣ Total Match Fours: {nice_line(teams[0], fours[teams[0]], teams[1], fours[teams[1]])}  ",
+        f"6️⃣ Total Match Sixes: {nice_line(teams[0], sixes[teams[0]], teams[1], sixes[teams[1]])}  ",
         "",
         f"🏏 Top Batter – {teams[0]}: {', '.join(top_bat[teams[0]][0])} "
         f"({top_bat[teams[0]][1]})  ",
@@ -188,5 +206,3 @@ if st.button("Extract Stats"):
         st.caption(f"Used {total_uses} times.")
     else:
         st.warning("❗ Please paste the HTML first.")
-
-
