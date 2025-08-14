@@ -12,11 +12,6 @@ st.markdown(
 )
 
 html = st.text_area("HTML source:", height=400)
-# --- session state so we don't recompute on every click ---
-if "res" not in st.session_state:
-    st.session_state.res = None
-    st.session_state.csv_bytes = None
-    st.session_state.match_title = "Match Summary"
 
 # ── tiny helpers ──────────────────────────────────────────────
 bold = lambda t: f"**{t}**"
@@ -32,24 +27,6 @@ def extract(raw):
 
     title_tag = soup.find("h1") or soup.find("title")
     m_title   = title_tag.get_text(" ", strip=True) if title_tag else "Match Summary"
-@st.cache_data(show_spinner=False, max_entries=16)
-def extract_cached(raw_html: str) -> str:
-    # cache the parse so identical HTML doesn't re-run BeautifulSoup
-    return extract(raw_html)
-
-def _compute_and_store(raw_html: str):
-    # run (or fetch from cache) and store results for later use
-    res = extract_cached(raw_html)
-    st.session_state.res = res
-    st.session_state.match_title = (
-        res.splitlines()[0].lstrip("# ").strip() if res else "Match Summary"
-    )
-
-    buf = io.StringIO()
-    w = csv.writer(buf)
-    w.writerow(["match", "output"])
-    w.writerow([st.session_state.match_title, res])
-    st.session_state.csv_bytes = buf.getvalue().encode("utf-8-sig")
 
     # ── teams ────────────────────────────────────────────────
     teams = []
@@ -186,40 +163,46 @@ def _compute_and_store(raw_html: str):
     return md
 
 # ── run button ──────────────────────────────────────────────
-# ── run button (no heavy work inside the button) ────────────
-st.button("Extract Stats", on_click=_compute_and_store, kwargs={"raw_html": html})
+if st.button("Extract Stats"):
+    if html.strip():
+        res = extract(html)  # store the result once
+        st.markdown(res, unsafe_allow_html=True)
 
-# Show results (if we have them) — no recompute on download clicks
-if st.session_state.res:
-    st.markdown(st.session_state.res, unsafe_allow_html=True)
+        # CSV export (self-contained)
+        import io, csv
+        match_title = res.splitlines()[0].lstrip("# ").strip() if res else "Match Summary"
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["match", "output"])
+        writer.writerow([match_title, res])
+        csv_bytes = buf.getvalue().encode("utf-8-sig")
 
-    st.download_button(
-        label="Download CSV of this result",
-        data=st.session_state.csv_bytes,
-        file_name="scorecard_extract.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
+        st.download_button(
+            label="Download CSV of this result",
+            data=csv_bytes,
+            file_name="scorecard_extract.csv",
+            mime="text/csv",
+        )
 
-    # Subtle usage counter (unchanged logic, just placed here)
-    try:
-        import json
-        from pathlib import Path
-        COUNTER_FILE = Path("usage_count.json")
-        data = {}
-        if COUNTER_FILE.exists():
-            try:
-                data = json.loads(COUNTER_FILE.read_text() or "{}")
-            except Exception:
-                data = {}
-        total_uses = int(data.get("count", 0)) + 1
-        data["count"] = total_uses
-        COUNTER_FILE.write_text(json.dumps(data))
-    except Exception:
-        total_uses = st.session_state.get("_session_count", 0) + 1
-        st.session_state["_session_count"] = total_uses
+        # Subtle usage counter (placed at the very end of the block)
+        try:
+            import json
+            from pathlib import Path
+            COUNTER_FILE = Path("usage_count.json")
+            data = {}
+            if COUNTER_FILE.exists():
+                try:
+                    data = json.loads(COUNTER_FILE.read_text() or "{}")
+                except Exception:
+                    data = {}
+            total_uses = int(data.get("count", 0)) + 1
+            data["count"] = total_uses
+            COUNTER_FILE.write_text(json.dumps(data))
+        except Exception:
+            # Fallback: per-session count only (doesn't persist across restarts)
+            total_uses = st.session_state.get("_session_count", 0) + 1
+            st.session_state["_session_count"] = total_uses
 
-    st.caption(f"Used {total_uses} times.")
-
+        st.caption(f"Used {total_uses} times.")
     else:
         st.warning("❗ Please paste the HTML first.")
