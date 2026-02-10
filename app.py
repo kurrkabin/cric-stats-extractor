@@ -13,9 +13,16 @@ st.markdown(
 )
 
 html = st.text_area("HTML source:", height=400)
-def table_team(tbl):
+def table_team(tbl, teams):
     th = tbl.find("th")
-    return th.get_text(strip=True).replace(" Innings", "") if th else None
+    if not th:
+        return None
+    txt = th.get_text(" ", strip=True)
+    for t in teams:
+        if t in txt:
+            return t
+    return None
+
 
 # ── tiny helpers ──────────────────────────────────────────────
 bold = lambda t: f"**{t}**"
