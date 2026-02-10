@@ -13,16 +13,6 @@ st.markdown(
 )
 
 html = st.text_area("HTML source:", height=400)
-def table_team(tbl, teams):
-    th = tbl.find("th")
-    if not th:
-        return None
-    txt = th.get_text(" ", strip=True)
-    for t in teams:
-        if t in txt:
-            return t
-    return None
-
 
 # ── tiny helpers ──────────────────────────────────────────────
 bold = lambda t: f"**{t}**"
@@ -90,9 +80,7 @@ def extract(raw):
 
     # ── batting tables ───────────────────────────────────────
     for i, tbl in enumerate(bat_tbls):
-        bat_t = table_team(tbl)
-        bowl_t = teams[0] if bat_t == teams[1] else teams[1]
-
+        bat_t, bowl_t = teams[i % 2], teams[1 - (i % 2)]
 
         best_r = 0
         best_names = []                   # ← track *all* batters with best_r
@@ -129,7 +117,7 @@ def extract(raw):
     # ── bowling tables ───────────────────────────────────────
     bowl_stats = {t: [] for t in teams}
     for i, tbl in enumerate(bowl_tbls):
-        bowl_t = table_team(tbl)
+        bowl_t = teams[1 - (i % 2)]
         heads = [th.get_text(" ", strip=True).lower().replace("\xa0", " ") for th in tbl.find_all("th")]
 
         def _find_idx(options, default=None):
