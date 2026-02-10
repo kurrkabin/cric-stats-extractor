@@ -60,8 +60,7 @@ def extract(raw):
 
     if len(teams) < 2:
         return "❌ Could not detect both teams."
-
-
+    teams = teams[::-1]  # 🔁 swap Team A ↔ Team B
     # ── split batting / bowling tables ───────────────────────
     bat_tbls, bowl_tbls = [], []
     for tbl in soup.find_all("table"):
