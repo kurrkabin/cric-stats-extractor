@@ -179,27 +179,33 @@ for tbl in bowl_tbls:
     hi_name, hi_runs = max(top_all.items(), key=lambda x: x[1])
     hi_team = batter_team.get(hi_name, "Unknown")
 
+       # ── highest individual score overall ─────────────────────
+    hi_name, hi_runs = max(top_all.items(), key=lambda x: x[1])
+    hi_team = batter_team.get(hi_name, "Unknown")
+
     # ── assemble markdown ────────────────────────────────────
     md = "\n".join([
         f"### {m_title}",
         "",
-        f"🏅 Highest Individual Score: {hi_name} ({hi_runs}) – {hi_team}  ",
+        f"🏅 Highest Individual Score: {hi_name} ({hi_runs}) – {hi_team}  ",
         "",
-        f"4️⃣ Total Match Fours: {nice_line(teams[0], fours[teams[0]], teams[1], fours[teams[1]])}  ",
-        f"6️⃣ Total Match Sixes: {nice_line(teams[0], sixes[teams[0]], teams[1], sixes[teams[1]])}  ",
+        f"4️⃣ Total Match Fours: {nice_line(teams[0], fours[teams[0]], teams[1], fours[teams[1]])}  ",
+        f"6️⃣ Total Match Sixes: {nice_line(teams[0], sixes[teams[0]], teams[1], sixes[teams[1]])}  ",
         "",
-        f"🏏 Top Batter – {teams[0]}: {', '.join(top_bat[teams[0]][0])} "
+        f"🏏 Top Batter – {teams[0]}: {', '.join(top_bat[teams[0]][0])} "
         f"({top_bat[teams[0]][1]})  ",
-        f"🏏 Top Batter – {teams[1]}: {', '.join(top_bat[teams[1]][0])} "
+        f"🏏 Top Batter – {teams[1]}: {', '.join(top_bat[teams[1]][0])} "
         f"({top_bat[teams[1]][1]})  ",
         "",
-        f"⚾ Top Bowler – {teams[0]}: {', '.join(top_bowl[teams[0]])}  ",
-        f"⚾ Top Bowler – {teams[1]}: {', '.join(top_bowl[teams[1]])}  ",
+        f"⚾ Top Bowler – {teams[0]}: {', '.join(top_bowl[teams[0]])}  ",
+        f"⚾ Top Bowler – {teams[1]}: {', '.join(top_bowl[teams[1]])}  ",
         "",
-        f"🏃 Most Run Outs (by bowling side): "
+        f"🏃 Most Run Outs (by bowling side): "
         f"{nice_line(teams[0], runouts[teams[0]], teams[1], runouts[teams[1]])}  ",
-     ])
-     return md
+    ])
+    return md
+
+
 
 # ── run button ──────────────────────────────────────────────
 if st.button("Extract Stats"):
