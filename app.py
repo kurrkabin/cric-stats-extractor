@@ -29,14 +29,38 @@ def extract(raw):
     title_tag = soup.find("h1") or soup.find("title")
     m_title   = title_tag.get_text(" ", strip=True) if title_tag else "Match Summary"
 
-    # ── teams ────────────────────────────────────────────────
+        # ── teams (NEW ESPN-safe logic) ─────────────────────────
     teams = []
-    for span in soup.select("span.ds-text-title-xs.ds-font-bold.ds-capitalize"):
-        t = span.get_text(strip=True).replace(" Innings", "")
-        if t and t not in teams:
-            teams.append(t)
+
+    # 1️⃣ Try structured data (modern ESPN)
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(script.string)
+        except Exception:
+            continue
+
+        # ESPN may wrap this in @graph
+        items = data.get("@graph", [data])
+        for item in items:
+            if item.get("@type") == "SportsEvent":
+                home = item.get("homeTeam", {}).get("name")
+                away = item.get("awayTeam", {}).get("name")
+                if home and away:
+                    teams = [home.strip(), away.strip()]
+                    break
+        if len(teams) == 2:
+            break
+
+    # 2️⃣ Fallback: legacy span-based detection (old ESPN)
     if len(teams) < 2:
-        return "❌ Could not detect both teams."
+        for span in soup.select("span.ds-text-title-xs.ds-font-bold.ds-capitalize"):
+            t = span.get_text(strip=True).replace(" Innings", "")
+            if t and t not in teams:
+                teams.append(t)
+
+    if len(teams) < 2:
+        return "❌ Could not detect both teams."
+
 
     # ── split batting / bowling tables ───────────────────────
     bat_tbls, bowl_tbls = [], []
