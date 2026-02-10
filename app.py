@@ -13,6 +13,15 @@ st.markdown(
 )
 
 html = st.text_area("HTML source:", height=400)
+def get_team_from_table(tbl, teams):
+    th = tbl.find("th")
+    if not th:
+        return None
+    txt = th.get_text(" ", strip=True).lower()
+    for t in teams:
+        if t.lower() in txt:
+            return t
+    return None
 
 # ── tiny helpers ──────────────────────────────────────────────
 bold = lambda t: f"**{t}**"
@@ -79,76 +88,81 @@ def extract(raw):
     top_bat, top_all, batter_team = {}, {}, {}
 
     # ── batting tables ───────────────────────────────────────
-    for i, tbl in enumerate(bat_tbls):
-        bat_t, bowl_t = teams[i % 2], teams[1 - (i % 2)]
+for tbl in bat_tbls:
+    bat_t = get_team_from_table(tbl, teams)
+    if not bat_t:
+        continue
+    bowl_t = next(t for t in teams if t != bat_t)
 
-        best_r = 0
-        best_names = []                   # ← track *all* batters with best_r
+    best_r = 0
+    best_names = []
 
-        for row in tbl.find_all("tr")[1:]:
-            tds = row.find_all("td")
-            if len(tds) < 7:
-                continue
-            name = tds[0].get_text(strip=True).split("(")[0].strip()
-            try:
-                runs = int(tds[2].get_text(strip=True))
-                _4s  = int(tds[5].get_text(strip=True))
-                _6s  = int(tds[6].get_text(strip=True))
-            except ValueError:
-                continue
+    for row in tbl.find_all("tr")[1:]:
+        tds = row.find_all("td")
+        if len(tds) < 7:
+            continue
 
-            fours[bat_t] += _4s
-            sixes[bat_t] += _6s
-            batter_team[name] = bat_t
-            top_all[name] = max(runs, top_all.get(name, 0))
+        name = tds[0].get_text(strip=True).split("(")[0].strip()
+        try:
+            runs = int(tds[2].get_text(strip=True))
+            _4s  = int(tds[5].get_text(strip=True))
+            _6s  = int(tds[6].get_text(strip=True))
+        except ValueError:
+            continue
 
-            # ── choose top batter(s) for this team ──────────
-            if runs > best_r:
-                best_r, best_names = runs, [name]   # new leader
-            elif runs == best_r:
-                best_names.append(name)             # tie → add
+        fours[bat_t] += _4s
+        sixes[bat_t] += _6s
+        batter_team[name] = bat_t
+        top_all[name] = max(runs, top_all.get(name, 0))
 
-            # count run‑outs credited to bowling side
-            if "run out" in " ".join(td.get_text(strip=True).lower() for td in row):
-                runouts[bowl_t] += 1
+        if runs > best_r:
+            best_r, best_names = runs, [name]
+        elif runs == best_r:
+            best_names.append(name)
 
-        top_bat[bat_t] = (best_names, best_r)
+        if "run out" in " ".join(td.get_text(strip=True).lower() for td in tds):
+            runouts[bowl_t] += 1
+
+    top_bat[bat_t] = (best_names, best_r)
+
 
     # ── bowling tables ───────────────────────────────────────
-    bowl_stats = {t: [] for t in teams}
-    for i, tbl in enumerate(bowl_tbls):
-        bowl_t = teams[1 - (i % 2)]
-        heads = [th.get_text(" ", strip=True).lower().replace("\xa0", " ") for th in tbl.find_all("th")]
+bowl_stats = {t: [] for t in teams}
 
-        def _find_idx(options, default=None):
-            for o in options:
-                if o in heads:
-                    return heads.index(o)
-            return default
+for tbl in bowl_tbls:
+    bat_t = get_team_from_table(tbl, teams)
+    if not bat_t:
+        continue
+    bowl_t = next(t for t in teams if t != bat_t)
 
-        # accept “r” or “runs”, and “w/wk/wkts/wickets”
-        r_idx = _find_idx(("r", "runs"), 3)
-        w_idx = _find_idx(("w", "wk", "wkts", "wickets"), 4)
+    heads = [th.get_text(" ", strip=True).lower().replace("\xa0", " ")
+             for th in tbl.find_all("th")]
 
-        for row in tbl.find_all("tr")[1:]:
-            tds = row.find_all("td")
-            if len(tds) <= max(r_idx, w_idx):
-                continue
+    def _find_idx(options, default=None):
+        for o in options:
+            if o in heads:
+                return heads.index(o)
+        return default
 
-            # bowler name (skip Extras/Total rows)
-            name = tds[0].get_text(" ", strip=True).split("(")[0].strip()
-            if not name or name.lower().startswith(("extras", "total")):
-                continue
+    r_idx = _find_idx(("r", "runs"), 3)
+    w_idx = _find_idx(("w", "wk", "wkts", "wickets"), 4)
 
-            # tolerant numeric parsing (handles dashes/extra text)
-            runs_txt = tds[r_idx].get_text(strip=True)
-            wkts_txt = tds[w_idx].get_text(strip=True)
-            m_r = re.search(r"\d+", runs_txt)
-            m_w = re.search(r"\d+", wkts_txt)
-            runs = int(m_r.group()) if m_r else 0
-            wkts = int(m_w.group()) if m_w else 0
+    for row in tbl.find_all("tr")[1:]:
+        tds = row.find_all("td")
+        if len(tds) <= max(r_idx, w_idx):
+            continue
 
-            bowl_stats[bowl_t].append((name, wkts, runs))
+        name = tds[0].get_text(" ", strip=True).split("(")[0].strip()
+        if not name or name.lower().startswith(("extras", "total")):
+            continue
+
+        m_r = re.search(r"\d+", tds[r_idx].get_text(strip=True))
+        m_w = re.search(r"\d+", tds[w_idx].get_text(strip=True))
+        runs = int(m_r.group()) if m_r else 0
+        wkts = int(m_w.group()) if m_w else 0
+
+        bowl_stats[bowl_t].append((name, wkts, runs))
+
 
     def best_bowler(lst):
         if not lst:
