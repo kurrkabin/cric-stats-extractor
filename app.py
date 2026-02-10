@@ -23,6 +23,13 @@ def nice_line(l_team, l_val, r_team, r_val):
     return f"{left} : {right}"
 
 # ── main extractor ────────────────────────────────────────────
+def infer_batting_team(tbl):
+    th = tbl.find("th")
+    if not th:
+        return None
+    txt = th.get_text(" ", strip=True)
+    return txt.replace(" Innings", "").strip()
+
 def extract(raw):
     soup = BeautifulSoup(raw, "html.parser")
 
@@ -31,7 +38,7 @@ def extract(raw):
 
         # ── teams (NEW ESPN-safe logic) ─────────────────────────
     teams = []
-
+  
     # 1️⃣ Try structured data (modern ESPN)
     for script in soup.find_all("script", type="application/ld+json"):
         try:
@@ -77,6 +84,12 @@ def extract(raw):
     runouts = {t: 0 for t in teams}
 
     top_bat, top_all, batter_team = {}, {}, {}
+         # ── align team order with batting table order ───────────
+    if bat_tbls:
+        first_batting_team = infer_batting_team(bat_tbls[0])
+        if first_batting_team and first_batting_team in teams:
+            other = teams[1] if teams[0] == first_batting_team else teams[0]
+            teams = [first_batting_team, other]
 
     # ── batting tables ───────────────────────────────────────
     for i, tbl in enumerate(bat_tbls):
