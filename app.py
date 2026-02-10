@@ -198,8 +198,8 @@ for tbl in bowl_tbls:
         "",
         f"🏃 Most Run Outs (by bowling side): "
         f"{nice_line(teams[0], runouts[teams[0]], teams[1], runouts[teams[1]])}  ",
-    ])
-    return md
+     ])
+     return md
 
 
 
