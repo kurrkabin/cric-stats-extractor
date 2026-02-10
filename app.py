@@ -179,10 +179,6 @@ for tbl in bowl_tbls:
     hi_name, hi_runs = max(top_all.items(), key=lambda x: x[1])
     hi_team = batter_team.get(hi_name, "Unknown")
 
-       # ── highest individual score overall ─────────────────────
-    hi_name, hi_runs = max(top_all.items(), key=lambda x: x[1])
-    hi_team = batter_team.get(hi_name, "Unknown")
-
     # ── assemble markdown ────────────────────────────────────
     md = "\n".join([
         f"### {m_title}",
