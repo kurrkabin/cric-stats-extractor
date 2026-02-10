@@ -212,4 +212,5 @@ if st.button("Extract Stats"):
         res = extract(html)
         st.markdown(res, unsafe_allow_html=True)
     else:
-        st.
+        st.markdown("...")
+
