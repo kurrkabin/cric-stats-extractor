@@ -8,12 +8,11 @@ import io, csv
 st.set_page_config(layout="wide")
 st.title("Cricket Scorecard Extractor 🏏")
 st.markdown(
-    "Paste the **full** HTML source (Ctrl‑U → Ctrl‑A → Ctrl‑C) of an ESPNcricinfo "
-    "scorecard, then click **Extract Stats**."
+    "Paste the **full** HTML source (Ctrl‑U → Ctrl‑A → Ctrl‑C) of an ESPNcricinfo "
+    "scorecard, then click **Extract Stats**."
 )
 
 html = st.text_area("HTML source:", height=400)
-swap_team_order = st.checkbox("Swap team order for output", value=False)
 
 # ── tiny helpers ──────────────────────────────────────────────
 bold = lambda t: f"**{t}**"
@@ -30,7 +29,7 @@ def extract(raw):
     title_tag = soup.find("h1") or soup.find("title")
     m_title   = title_tag.get_text(" ", strip=True) if title_tag else "Match Summary"
 
-        # ── teams (NEW ESPN-safe logic) ─────────────────────────
+    # ── teams (ESPN-safe logic, NO automatic swap) ─────────────
     teams = []
 
     # 1️⃣ Try structured data (modern ESPN)
@@ -39,8 +38,6 @@ def extract(raw):
             data = json.loads(script.string)
         except Exception:
             continue
-
-        # ESPN may wrap this in @graph
         items = data.get("@graph", [data])
         for item in items:
             if item.get("@type") == "SportsEvent":
@@ -60,29 +57,50 @@ def extract(raw):
                 teams.append(t)
 
     if len(teams) < 2:
-    if len(teams) < 2:
         return "❌ Could not detect both teams."
 
-    # Use innings/table order for STAT ASSIGNMENT.
-    # This is the important fix.
-    table_teams = extract_table_team_order(soup)
-    if len(table_teams) < 2:
-        table_teams = teams[:]
+    # ── split batting / bowling tables ───────────────────────
+    bat_tbls, bowl_tbls = [], []
+    for tbl in soup.find_all("table"):
+        heads = [th.get_text(strip=True).lower() for th in tbl.find_all("th")]
+        if {"batting", "4s", "6s"}.issubset(heads):
+            bat_tbls.append(tbl)
+        elif "bowling" in heads and any(h in heads for h in ("w", "wk", "wkts", "wickets")):
+            bowl_tbls.append(tbl)
 
-    # Only use swap for FINAL DISPLAY order.
-    display_teams = table_teams[::-1] if swap_team_order else table_teams[:]    
-    fours   = {t: 0 for t in table_teams}
-    sixes   = {t: 0 for t in table_teams}
-    runouts = {t: 0 for t in table_teams}
+    # ── map batting tables to teams ──────────────────────────
+    # Each batting table belongs to the team whose name appears nearby
+    # (in a preceding heading/caption). Fall back to index order if not found.
+    def find_team_for_table(tbl, teams):
+        """Walk backwards through siblings/parents to find a team name label."""
+        for candidate in [tbl] + list(tbl.parents)[:4]:
+            for sibling in getattr(candidate, "previous_siblings", []):
+                text = sibling.get_text(" ", strip=True) if hasattr(sibling, "get_text") else str(sibling)
+                for t in teams:
+                    if t.lower() in text.lower():
+                        return t
+        return None
+
+    fours   = {t: 0 for t in teams}
+    sixes   = {t: 0 for t in teams}
+    runouts = {t: 0 for t in teams}
 
     top_bat, top_all, batter_team = {}, {}, {}
-   
+
     # ── batting tables ───────────────────────────────────────
     for i, tbl in enumerate(bat_tbls):
-        bat_t, bowl_t = table_teams[i % 2], table_teams[1 - (i % 2)]
+        # Try to detect which team is batting from surrounding HTML
+        detected = find_team_for_table(tbl, teams)
+        if detected:
+            bat_t  = detected
+            bowl_t = teams[1] if detected == teams[0] else teams[0]
+        else:
+            # fallback: assume alternating order as ESPN renders them
+            bat_t  = teams[i % 2]
+            bowl_t = teams[1 - (i % 2)]
 
         best_r = 0
-        best_names = []                   # ← track *all* batters with best_r
+        best_names = []
 
         for row in tbl.find_all("tr")[1:]:
             tds = row.find_all("td")
@@ -101,22 +119,27 @@ def extract(raw):
             batter_team[name] = bat_t
             top_all[name] = max(runs, top_all.get(name, 0))
 
-            # ── choose top batter(s) for this team ──────────
             if runs > best_r:
-                best_r, best_names = runs, [name]   # new leader
+                best_r, best_names = runs, [name]
             elif runs == best_r:
-                best_names.append(name)             # tie → add
+                best_names.append(name)
 
-            # count run‑outs credited to bowling side
             if "run out" in " ".join(td.get_text(strip=True).lower() for td in row):
                 runouts[bowl_t] += 1
 
         top_bat[bat_t] = (best_names, best_r)
 
     # ── bowling tables ───────────────────────────────────────
-    bowl_stats = {t: [] for t in table_teams}
+    bowl_stats = {t: [] for t in teams}
     for i, tbl in enumerate(bowl_tbls):
-        bowl_t = table_teams[1 - (i % 2)]    
+        detected = find_team_for_table(tbl, teams)
+        if detected:
+            # The bowling table shows the BOWLING team's bowlers
+            bowl_t = detected
+        else:
+            bowl_t = teams[1 - (i % 2)]
+
+        heads = [th.get_text(" ", strip=True).lower().replace("\xa0", " ") for th in tbl.find_all("th")]
 
         def _find_idx(options, default=None):
             for o in options:
@@ -124,7 +147,6 @@ def extract(raw):
                     return heads.index(o)
             return default
 
-        # accept “r” or “runs”, and “w/wk/wkts/wickets”
         r_idx = _find_idx(("r", "runs"), 3)
         w_idx = _find_idx(("w", "wk", "wkts", "wickets"), 4)
 
@@ -133,12 +155,10 @@ def extract(raw):
             if len(tds) <= max(r_idx, w_idx):
                 continue
 
-            # bowler name (skip Extras/Total rows)
             name = tds[0].get_text(" ", strip=True).split("(")[0].strip()
             if not name or name.lower().startswith(("extras", "total")):
                 continue
 
-            # tolerant numeric parsing (handles dashes/extra text)
             runs_txt = tds[r_idx].get_text(strip=True)
             wkts_txt = tds[w_idx].get_text(strip=True)
             m_r = re.search(r"\d+", runs_txt)
@@ -151,52 +171,53 @@ def extract(raw):
     def best_bowler(lst):
         if not lst:
             return ["No wickets"]
-        # many wickets first, then fewest runs
         lst.sort(key=lambda x: (-x[1], x[2]))
         top_w = lst[0][1]
         best_r = min(r for _, w, r in lst if w == top_w)
         return [f"{n} ({w})" for n, w, r in lst if w == top_w and r == best_r]
-        
-    top_bowl = {t: best_bowler(bowl_stats[t]) for t in table_teams}
+
+    top_bowl = {t: best_bowler(bowl_stats[t]) for t in teams}
 
     # ── highest individual score overall ─────────────────────
-     if top_all:
+    if top_all:
         hi_name, hi_runs = max(top_all.items(), key=lambda x: x[1])
         hi_team = batter_team.get(hi_name, "Unknown")
     else:
-        hi_name, hi_runs, hi_team = "N/A", 0, "Unknown"   
+        hi_name, hi_runs, hi_team = "N/A", 0, "N/A"
+
+    # Guard: ensure both teams have top_bat entry
+    for t in teams:
+        if t not in top_bat:
+            top_bat[t] = (["N/A"], 0)
 
     # ── assemble markdown ────────────────────────────────────
-    left_team, right_team = display_teams[0], display_teams[1]
-
     md = "\n".join([
         f"### {m_title}",
         "",
         f"🏅 Highest Individual Score: {hi_name} ({hi_runs}) – {hi_team}  ",
         "",
-        f"4️⃣ Total Match Fours: {nice_line(left_team, fours[left_team], right_team, fours[right_team])}  ",
-        f"6️⃣ Total Match Sixes: {nice_line(left_team, sixes[left_team], right_team, sixes[right_team])}  ",
+        f"4️⃣ Total Match Fours: {nice_line(teams[0], fours[teams[0]], teams[1], fours[teams[1]])}  ",
+        f"6️⃣ Total Match Sixes: {nice_line(teams[0], sixes[teams[0]], teams[1], sixes[teams[1]])}  ",
         "",
-        f"🏏 Top Batter – {left_team}: {', '.join(top_bat[left_team][0])} "
-        f"({top_bat[left_team][1]})  ",
-        f"🏏 Top Batter – {right_team}: {', '.join(top_bat[right_team][0])} "
-        f"({top_bat[right_team][1]})  ",
+        f"🏏 Top Batter – {teams[0]}: {', '.join(top_bat[teams[0]][0])} "
+        f"({top_bat[teams[0]][1]})  ",
+        f"🏏 Top Batter – {teams[1]}: {', '.join(top_bat[teams[1]][0])} "
+        f"({top_bat[teams[1]][1]})  ",
         "",
-        f"⚾ Top Bowler – {left_team}: {', '.join(top_bowl[left_team])}  ",
-        f"⚾ Top Bowler – {right_team}: {', '.join(top_bowl[right_team])}  ",
+        f"⚾ Top Bowler – {teams[0]}: {', '.join(top_bowl[teams[0]])}  ",
+        f"⚾ Top Bowler – {teams[1]}: {', '.join(top_bowl[teams[1]])}  ",
         "",
         f"🏃 Most Run Outs (by bowling side): "
-        f"{nice_line(left_team, runouts[left_team], right_team, runouts[right_team])}  ",
+        f"{nice_line(teams[0], runouts[teams[0]], teams[1], runouts[teams[1]])}  ",
     ])
+    return md
 
 # ── run button ──────────────────────────────────────────────
 if st.button("Extract Stats"):
     if html.strip():
-        res = extract(html)  # store the result once
+        res = extract(html)
         st.markdown(res, unsafe_allow_html=True)
 
-        # CSV export (self-contained)
-        import io, csv
         match_title = res.splitlines()[0].lstrip("# ").strip() if res else "Match Summary"
         buf = io.StringIO()
         writer = csv.writer(buf)
@@ -211,9 +232,7 @@ if st.button("Extract Stats"):
             mime="text/csv",
         )
 
-        # Subtle usage counter (placed at the very end of the block)
         try:
-            import json
             from pathlib import Path
             COUNTER_FILE = Path("usage_count.json")
             data = {}
@@ -226,7 +245,6 @@ if st.button("Extract Stats"):
             data["count"] = total_uses
             COUNTER_FILE.write_text(json.dumps(data))
         except Exception:
-            # Fallback: per-session count only (doesn't persist across restarts)
             total_uses = st.session_state.get("_session_count", 0) + 1
             st.session_state["_session_count"] = total_uses
 
