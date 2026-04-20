@@ -13,6 +13,7 @@ st.markdown(
 )
 
 html = st.text_area("HTML source:", height=400)
+swap_team_order = st.checkbox("Swap team order for output", value=False)
 
 # ── tiny helpers ──────────────────────────────────────────────
 bold = lambda t: f"**{t}**"
@@ -59,27 +60,26 @@ def extract(raw):
                 teams.append(t)
 
     if len(teams) < 2:
+    if len(teams) < 2:
         return "❌ Could not detect both teams."
-    teams = teams[::-1]  # 🔁 swap Team A ↔ Team B
-    # ── split batting / bowling tables ───────────────────────
-    bat_tbls, bowl_tbls = [], []
-    for tbl in soup.find_all("table"):
-        heads = [th.get_text(strip=True).lower() for th in tbl.find_all("th")]
-        if {"batting", "4s", "6s"}.issubset(heads):
-            bat_tbls.append(tbl)
-        elif "bowling" in heads and any(h in heads for h in ("w", "wk", "wkts", "wickets")):
 
-            bowl_tbls.append(tbl)
+    # Use innings/table order for STAT ASSIGNMENT.
+    # This is the important fix.
+    table_teams = extract_table_team_order(soup)
+    if len(table_teams) < 2:
+        table_teams = teams[:]
 
-    fours   = {t: 0 for t in teams}
-    sixes   = {t: 0 for t in teams}
-    runouts = {t: 0 for t in teams}
+    # Only use swap for FINAL DISPLAY order.
+    display_teams = table_teams[::-1] if swap_team_order else table_teams[:]    
+    fours   = {t: 0 for t in table_teams}
+    sixes   = {t: 0 for t in table_teams}
+    runouts = {t: 0 for t in table_teams}
 
     top_bat, top_all, batter_team = {}, {}, {}
-
+   
     # ── batting tables ───────────────────────────────────────
     for i, tbl in enumerate(bat_tbls):
-        bat_t, bowl_t = teams[i % 2], teams[1 - (i % 2)]
+        bat_t, bowl_t = table_teams[i % 2], table_teams[1 - (i % 2)]
 
         best_r = 0
         best_names = []                   # ← track *all* batters with best_r
@@ -114,10 +114,9 @@ def extract(raw):
         top_bat[bat_t] = (best_names, best_r)
 
     # ── bowling tables ───────────────────────────────────────
-    bowl_stats = {t: [] for t in teams}
+    bowl_stats = {t: [] for t in table_teams}
     for i, tbl in enumerate(bowl_tbls):
-        bowl_t = teams[1 - (i % 2)]
-        heads = [th.get_text(" ", strip=True).lower().replace("\xa0", " ") for th in tbl.find_all("th")]
+        bowl_t = table_teams[1 - (i % 2)]    
 
         def _find_idx(options, default=None):
             for o in options:
@@ -157,34 +156,38 @@ def extract(raw):
         top_w = lst[0][1]
         best_r = min(r for _, w, r in lst if w == top_w)
         return [f"{n} ({w})" for n, w, r in lst if w == top_w and r == best_r]
-
-    top_bowl = {t: best_bowler(bowl_stats[t]) for t in teams}
+        
+    top_bowl = {t: best_bowler(bowl_stats[t]) for t in table_teams}
 
     # ── highest individual score overall ─────────────────────
-    hi_name, hi_runs = max(top_all.items(), key=lambda x: x[1])
-    hi_team = batter_team.get(hi_name, "Unknown")
+     if top_all:
+        hi_name, hi_runs = max(top_all.items(), key=lambda x: x[1])
+        hi_team = batter_team.get(hi_name, "Unknown")
+    else:
+        hi_name, hi_runs, hi_team = "N/A", 0, "Unknown"   
 
     # ── assemble markdown ────────────────────────────────────
+    left_team, right_team = display_teams[0], display_teams[1]
+
     md = "\n".join([
         f"### {m_title}",
         "",
-        f"🏅 Highest Individual Score: {hi_name} ({hi_runs}) – {hi_team}  ",
+        f"🏅 Highest Individual Score: {hi_name} ({hi_runs}) – {hi_team}  ",
         "",
-        f"4️⃣ Total Match Fours: {nice_line(teams[0], fours[teams[0]], teams[1], fours[teams[1]])}  ",
-        f"6️⃣ Total Match Sixes: {nice_line(teams[0], sixes[teams[0]], teams[1], sixes[teams[1]])}  ",
+        f"4️⃣ Total Match Fours: {nice_line(left_team, fours[left_team], right_team, fours[right_team])}  ",
+        f"6️⃣ Total Match Sixes: {nice_line(left_team, sixes[left_team], right_team, sixes[right_team])}  ",
         "",
-        f"🏏 Top Batter – {teams[0]}: {', '.join(top_bat[teams[0]][0])} "
-        f"({top_bat[teams[0]][1]})  ",
-        f"🏏 Top Batter – {teams[1]}: {', '.join(top_bat[teams[1]][0])} "
-        f"({top_bat[teams[1]][1]})  ",
+        f"🏏 Top Batter – {left_team}: {', '.join(top_bat[left_team][0])} "
+        f"({top_bat[left_team][1]})  ",
+        f"🏏 Top Batter – {right_team}: {', '.join(top_bat[right_team][0])} "
+        f"({top_bat[right_team][1]})  ",
         "",
-        f"⚾ Top Bowler – {teams[0]}: {', '.join(top_bowl[teams[0]])}  ",
-        f"⚾ Top Bowler – {teams[1]}: {', '.join(top_bowl[teams[1]])}  ",
+        f"⚾ Top Bowler – {left_team}: {', '.join(top_bowl[left_team])}  ",
+        f"⚾ Top Bowler – {right_team}: {', '.join(top_bowl[right_team])}  ",
         "",
-        f"🏃 Most Run Outs (by bowling side): "
-        f"{nice_line(teams[0], runouts[teams[0]], teams[1], runouts[teams[1]])}  ",
+        f"🏃 Most Run Outs (by bowling side): "
+        f"{nice_line(left_team, runouts[left_team], right_team, runouts[right_team])}  ",
     ])
-    return md
 
 # ── run button ──────────────────────────────────────────────
 if st.button("Extract Stats"):
