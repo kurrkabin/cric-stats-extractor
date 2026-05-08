@@ -1,9 +1,4 @@
-diff --git a/app.py b/app.py
-index 314eb72a487b221294da3a443ee195ced32f0244..c41ed7dde56eed1fa206faf8cc992b3f81d945a1 100644
---- a/app.py
-+++ b/app.py
-@@ -1,61 +1,187 @@
- import streamlit as st
+import streamlit as st
  from bs4 import BeautifulSoup
 +import json
  import re
