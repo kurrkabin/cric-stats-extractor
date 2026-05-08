@@ -190,7 +190,7 @@ def extract(raw):
 
         best_r = 0
         best_names = []                   # ← track *all* batters with best_r
-@@ -147,62 +273,59 @@ def extract(raw):
+def extract(raw):
         f"🏅 Highest Individual Score: {hi_name} ({hi_runs}) – {hi_team}  ",
         "",
         f"4️⃣ Total Match Fours: {nice_line(teams[0], fours[teams[0]], teams[1], fours[teams[1]])}  ",
